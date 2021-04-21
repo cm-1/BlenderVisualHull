@@ -9,10 +9,7 @@ bl_info = {
     "category": "Mesh",
 }
 
-# List of modules with their string names.
-myOwnModules = {
-    'importTest': importTest
-}
+
 # Reloading of modules so that changes to files other than
 # the __init__.py file are recognized/used.
 # Has to be done before the "normal" import calls later.
@@ -20,6 +17,15 @@ myOwnModules = {
 # https://developer.blender.org/diffusion/BA/browse/master/add_curve_extra_objects/__init__.py
 # (The page has also been web archived for future reference. 2021-04-02)
 if "bpy" in locals():
+    # List of modules with their string names.
+    # ORDER MATTERS!
+    # Suppose A imports B
+    # If we reload A before B here, then A will not have B's newest changes in it. 
+    # So, we need to reload some modules before the other modules that depend on them.
+    myOwnModules = {
+        'nestedImportTest': nestedImportTest,
+        'importTest': importTest,
+    }
     import importlib
     for moduleName, module in myOwnModules.items():
         print("Reinstalling:", moduleName)
