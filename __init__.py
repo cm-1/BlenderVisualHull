@@ -23,7 +23,8 @@ if "bpy" in locals():
     # If we reload A before B here, then A will not have B's newest changes in it. 
     # So, we need to reload some modules before the other modules that depend on them.
     myOwnModules = {
-        'nestedImportTest': nestedImportTest,
+        'rbt': rbt,
+        'visHullTwoD': visHullTwoD,
         'importTest': importTest,
     }
     import importlib

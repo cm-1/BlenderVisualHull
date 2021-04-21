@@ -1,1 +1,4 @@
 __pycache__/
+
+# rbt.py ignored until I replace it with something that doesn't have licensing ambiguity.
+rbt.py
