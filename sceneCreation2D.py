@@ -69,16 +69,4 @@ class SceneCreator2D:
 
         scene = bpy.context.scene
         scene.collection.objects.link(scene2D)
-        #scene2D.select = True
-
-        '''
-        collectionToUpdate = None
-        print("Type of collections:", type(bpy.data.collections))
-        if len(bpy.data.collections) > 0:
-            collectionToUpdate = bpy.data.collections[0]
-        else:
-            collectionToUpdate = bpy.data.collections.new('scene_2D_collection')
-            bpy.context.scene.collection.children.link(collectionToUpdate)
-        collectionToUpdate = objects.link(scene2D)
-        '''
 

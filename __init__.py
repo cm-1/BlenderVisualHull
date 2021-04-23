@@ -45,31 +45,24 @@ else:
 import bpy
 from .importTest import PointCreator
 from .sceneCreation2D import SceneCreator2D
+from . import rbt # Unused import, but needed for above importlib stuff.
 
 
-
-class ObjectCursorArray(bpy.types.Operator):
-    """Object Cursor Array"""
-    bl_idname = "object.cursor_array"
-    bl_label = "Cursor Array"
+class ObjectVisualHull(bpy.types.Operator):
+    """Object Visual Hull"""
+    bl_idname = "object.visual_hull"
+    bl_label = "Visual Hull"
     bl_options = {'REGISTER', 'UNDO'}
     
-    # moved assignment from execute() to the body of the class...
-    total: bpy.props.IntProperty(name="Steps", default=2, min=1, max=100)
+    # unusedProp: bpy.props.IntProperty(name="Unused Property", default=2, min=1, max=100)
 
     def execute(self, context):
-        pc = PointCreator(self.total)
-        scene = context.scene
-        cursor = scene.cursor.location
-        obj = context.active_object
+        # pc = PointCreator(self.unusedProp)
+        pc = PointCreator()
 
-        points = pc.getPoints(-50, 50, 100)
+        pc.getPoints()
 
-        for pt in points:
-            obj_new = obj.copy()
-            scene.collection.objects.link(obj_new)
-
-            obj_new.location = (pt[0], pt[1], 1)
+        pc.scenePrintTest()
 
         return {'FINISHED'}
 
@@ -88,22 +81,22 @@ class ObjectSceneCreation2D(bpy.types.Operator):
 
         return {'FINISHED'}  
 
-def menu_func_cursor(self, context):
-    self.layout.operator(ObjectCursorArray.bl_idname)
+def menu_func_visual_hull(self, context):
+    self.layout.operator(ObjectVisualHull.bl_idname)
 
 def menu_func_scene_2D(self, context):
     self.layout.operator(ObjectSceneCreation2D.bl_idname)
 
 def register():
-    bpy.utils.register_class(ObjectCursorArray)
-    bpy.types.VIEW3D_MT_object.append(menu_func_cursor)
+    bpy.utils.register_class(ObjectVisualHull)
+    bpy.types.VIEW3D_MT_object.append(menu_func_visual_hull)
 
     bpy.utils.register_class(ObjectSceneCreation2D)
     bpy.types.VIEW3D_MT_add.append(menu_func_scene_2D)
 
 def unregister():
-    bpy.utils.unregister_class(ObjectCursorArray)
-    bpy.types.VIEW3D_MT_object.remove(menu_func_cursor)
+    bpy.utils.unregister_class(ObjectVisualHull)
+    bpy.types.VIEW3D_MT_object.remove(menu_func_visual_hull)
 
     bpy.utils.unregister_class(ObjectSceneCreation2D)
     bpy.types.VIEW3D_MT_add.remove(menu_func_scene_2D)

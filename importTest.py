@@ -1,29 +1,66 @@
+import bpy
+import bmesh
+
 import numpy as np
 import math
 
 from .visHullTwoD import Scene
 
 class PointCreator:
-    def __init__(self, varToUse):
-        self.varToUse = varToUse
+    def __init__(self):
+        print("Creating PointCreator")
 
-        
+    def getPoints(self):
+        # Get the active mesh
+        obj = bpy.context.object
 
-    def getPoints(self, start, end, numPoints):
 
-        xVals = np.linspace(start, end, numPoints)
+        scene = Scene()
 
-        testFunc = lambda a: (10.0*np.sin(a) - self.varToUse)
+        for poly in obj.data.polygons:
+            polyVerts = []
+            for vi in poly.vertices:
+                newVert = (obj.data.vertices[vi].co.x, obj.data.vertices[vi].co.y)
+                polyVerts.append(newVert)
+            scene.addPolygon(polyVerts)
+        scene.calcFreeLines()
 
-        yVals = testFunc(xVals)
 
-        retVal = np.column_stack((xVals, yVals))
+        vertices = []
+        edges = []
+        faces = []
 
-        print("\nTest message here!\n")
+        for f in scene.drawableFaces:
+            if f.visualNumber == 0:
+                currVertCount = len(vertices)
+                pts = f.getCoords()
+                vertices += [(v[0], v[1], 0) for v in pts]
+                polygonFace = tuple(range(currVertCount, currVertCount + len(pts)))
+                faces.append(polygonFace)
 
-        self.scenePrintTest()
 
-        return retVal
+        new_mesh = bpy.data.meshes.new('new_mesh')
+        new_mesh.from_pydata(vertices, edges, faces)
+        new_mesh.update()
+
+
+        # Mesh replacement/removal learned from an answer by user satishgoda 
+        # on Blender StackExchange submitted 2019-08-10 in response to the
+        # question "Is there any way to replace an object?" asked by user atek
+        # on 2016-10-16. Link to the answer:
+        # https://blender.stackexchange.com/a/148084
+        # The question has also been web archived at:
+        # http://web.archive.org/web/20201112022110/https://blender.stackexchange.com/questions/65128/is-there-any-way-to-replace-an-object
+        meshToRemove = obj.data
+
+        obj.data = new_mesh
+
+        if meshToRemove.users or meshToRemove.use_fake_user:
+            print("Guess I don't remove it.")
+        else:
+            bpy.data.meshes.remove(meshToRemove)
+
+        return
 
     def scenePrintTest(self):
         scene = Scene()
@@ -44,3 +81,5 @@ class PointCreator:
             print(" - Pts:")
             for pt in pts:
                 print("   -", pt)
+        
+        return
