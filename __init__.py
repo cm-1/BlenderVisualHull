@@ -26,6 +26,7 @@ if "bpy" in locals():
         'rbt': rbt,
         'visHullTwoD': visHullTwoD,
         'importTest': importTest,
+        'sceneCreation2D': sceneCreation2D
     }
     import importlib
     for moduleName, module in myOwnModules.items():
@@ -43,6 +44,7 @@ else:
 # Now, the "normal" imports
 import bpy
 from .importTest import PointCreator
+from .sceneCreation2D import SceneCreator2D
 
 
 
@@ -70,18 +72,41 @@ class ObjectCursorArray(bpy.types.Operator):
             obj_new.location = (pt[0], pt[1], 1)
 
         return {'FINISHED'}
-    
 
-def menu_func(self, context):
+class ObjectSceneCreation2D(bpy.types.Operator):
+    """Object 2D Scene Creator"""
+    bl_idname = "object.scene_creation_two_dimensional"
+    bl_label = "Scene 2D"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    # moved assignment from execute() to the body of the class...
+    sceneNum: bpy.props.IntProperty(name="Scene Number", default=5, min=0, max=6)
+
+    def execute(self, context):
+        sc = SceneCreator2D(self.sceneNum)
+        sc.createScene()
+
+        return {'FINISHED'}  
+
+def menu_func_cursor(self, context):
     self.layout.operator(ObjectCursorArray.bl_idname)
+
+def menu_func_scene_2D(self, context):
+    self.layout.operator(ObjectSceneCreation2D.bl_idname)
 
 def register():
     bpy.utils.register_class(ObjectCursorArray)
-    bpy.types.VIEW3D_MT_object.append(menu_func)
+    bpy.types.VIEW3D_MT_object.append(menu_func_cursor)
+
+    bpy.utils.register_class(ObjectSceneCreation2D)
+    bpy.types.VIEW3D_MT_add.append(menu_func_scene_2D)
 
 def unregister():
     bpy.utils.unregister_class(ObjectCursorArray)
-    bpy.types.VIEW3D_MT_object.remove(menu_func)
+    bpy.types.VIEW3D_MT_object.remove(menu_func_cursor)
+
+    bpy.utils.unregister_class(ObjectSceneCreation2D)
+    bpy.types.VIEW3D_MT_add.remove(menu_func_scene_2D)
 
 
 if __name__ == "__main__":
