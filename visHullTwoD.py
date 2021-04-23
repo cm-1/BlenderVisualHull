@@ -42,8 +42,8 @@ class Face:
         origHE = self.halfEdge
         he = self.halfEdge.next
         while he != origHE:
-            if he.headVertex is None:
-                break
+            #if he.headVertex is None:
+            #    break
             v = he.headVertex.position
             vertices.append(v)
             he = he.next
@@ -66,16 +66,22 @@ class HalfEdge:
 class HalfEdgeStructure:
     def __init__(self):
         self.verts = []
-        self.halfEdges = []
-        self.faces = []
+        self.halfEdges = {}
+        self.faces = {}
+        self.halfEdgeIndexCounter = 0
+        self.faceIndexCounter = 0
         self._exteriorFaceIndex = -1
         self.vertexOnShape = None
 
     def assignExteriorFace(self, halfEdge):
         if self._exteriorFaceIndex < 0:
-            self.faces.append(self.createNewFace(halfEdge))
-            self._exteriorFaceIndex = len(self.faces) - 1
+            self._exteriorFaceIndex = self.faceIndexCounter
+            self.createNewFace(halfEdge)
         halfEdge.leftFace = self.faces[self._exteriorFaceIndex]
+        
+    def removeFace(self, face):
+        if face.index in self.faces:
+            del self.faces[face.index]
 
     def removeHalfEdgePair(self, halfEdge):
         index0 = halfEdge.index
@@ -87,19 +93,21 @@ class HalfEdgeStructure:
         del self.halfEdges[index0]
 
     def createNewPairOfHalfEdges(self, vertex, increasesLeft):
-        newEdge = HalfEdge(len(self.halfEdges), increasesLeft)
-        newPair = HalfEdge(len(self.halfEdges) + 1, not increasesLeft)
+        newEdge = HalfEdge(self.halfEdgeIndexCounter, increasesLeft)
+        newPair = HalfEdge(self.halfEdgeIndexCounter + 1, not increasesLeft)
         newPair.headVertex = vertex
         
         newEdge.pair = newPair
         newPair.pair = newEdge
-        self.halfEdges.append(newEdge)
-        self.halfEdges.append(newPair)
+        self.halfEdges[self.halfEdgeIndexCounter] = newEdge
+        self.halfEdges[self.halfEdgeIndexCounter + 1] = newPair
+        self.halfEdgeIndexCounter += 2
         return newEdge
     
     def createNewFace(self, halfEdge):
-        newFace = Face(halfEdge, len(self.faces))
-        self.faces.append(newFace)
+        newFace = Face(halfEdge, self.faceIndexCounter)
+        self.faces[self.faceIndexCounter] = newFace
+        self.faceIndexCounter += 1
         return newFace
     
     def isExteriorFace(self, face):
@@ -770,25 +778,25 @@ class Scene:
     def calculateVisualHull(self):      
         self.partitionMesh = self.findIntersections()
     
-        correctedFaces = set()
         self.drawableFaces = []
-        for f in self.partitionMesh.faces:
+        for f in self.partitionMesh.faces.values():
             if self.partitionMesh.isExteriorFace(f):
                 continue
-            he = f.halfEdge
-            if he.headVertex is None:
-                continue
-            correctedFaces.add(f)
-            v = he.headVertex.position
+            #he = f.halfEdge
+            #if he.headVertex is None:
+            #    continue
+            '''v = he.headVertex.position
             origHE = he
             he = he.next
             while he != origHE:
-                if he.headVertex is None:
-                    break
+                #if he.headVertex is None:
+                #    break
                 v = he.headVertex.position
-                he = he.next
+                he = he.next'''
             self.drawableFaces.append(f)
         
+        print("Num of drawable faces:", len(self.drawableFaces))
+
         # We know that the below vertex is on the shape.
         # Now we need to find out which of its faces has visual number 0.
         # First, we can assume the vertex is convex, else it wouldn't
@@ -839,11 +847,9 @@ class Scene:
             
             vertHalfEdge = vertHalfEdge.pair.next
             
-        
+
         # Now, DFS to assign visual numbers to all faces.
         stack = [{"face": startingFace, "visualNumber": 0}]
-        if not (startingFace in correctedFaces):
-            print("TROUBLE!")
         while len(stack) > 0:
             currFace = stack.pop()
             if currFace["face"].visualNumber < 0:
@@ -851,17 +857,17 @@ class Scene:
                 currFace["face"].visualNumber = vn
                 halfEdge = currFace["face"].halfEdge
                 adjFace = halfEdge.pair.leftFace
-                if (not self.partitionMesh.isExteriorFace(adjFace)) and (adjFace in correctedFaces):
+                if (not self.partitionMesh.isExteriorFace(adjFace)) and (adjFace in self.drawableFaces):
                     vnChange = -1 if halfEdge.increasesLeft else 1
                     stack.append({"face": adjFace, "visualNumber": vn+vnChange})
                     
                 origHalfEdge = halfEdge
                 halfEdge = halfEdge.next
                 while halfEdge != origHalfEdge:
-                    if halfEdge is None:
-                        break
+                    #if halfEdge is None:
+                    #    break
                     adjFace = halfEdge.pair.leftFace
-                    if (not self.partitionMesh.isExteriorFace(adjFace)) and (adjFace in correctedFaces):
+                    if (not self.partitionMesh.isExteriorFace(adjFace)) and (adjFace in self.drawableFaces):
                         vnChange = -1 if halfEdge.increasesLeft else 1
                         stack.append({"face": adjFace, "visualNumber": vn+vnChange})
                     halfEdge = halfEdge.next    
@@ -929,9 +935,7 @@ class Scene:
             sweepLine.x = p.x
             sweepLine.y = p.y
             sweepLine.eventType = p.eventType
-            
-            debugList = []
-                    
+                                
             if p.eventType == EventType.LEFT:
                 s = next(iter(p.segments))
                 
@@ -974,30 +978,27 @@ class Scene:
                 succ = t.successor(sNode)
                 
                 t.removeGivenNode(sNode)
-    
+                
                 if (s.forwardHalfEdge is not None) and (s.forwardHalfEdge.headVertex is None): #possibly need to check x coords of pair.headVertex against current x coords?
-                    debugList.append(s)    
-                    '''halfEdge = s.forwardHalfEdge    
+                    halfEdge = s.forwardHalfEdge    
                     halfEdge.prev.next = halfEdge.pair.next
                     halfEdge.pair.next.prev = halfEdge.prev
-    
-                    keptFace = halfEdge.leftFace
-                    # If this half edge produced two new faces, one of them must be removed.
-                    if halfEdge.prev.leftFace != halfEdge.pair.next.leftFace:
-                        if not partitionMesh.isExteriorFace(halfEdge.leftFace):
-                            partitionMesh.removeFace(halfEdge.leftFace)
-                            keptFace = halfEdge.pair.next.leftFace
-                            halfEdge.prev.leftFace = keptFace
-                        else: # We can't remove the exterior face.
-                            partitionMesh.removeFace(halfEdge.pair.leftFace)
-                            keptFace = halfEdge.prev.leftFace
-                            halfEdge.pair.next.leftFace = keptFace
-                    # If the kept face's half edge is the one that we're deleting,
-                    # we need to replace that reference
-                    elif keptFace.halfEdge == halfEdge:
-                        keptFace.halfEdge = halfEdge.pair.next
                     
-                    partitionMesh.removeHalfEdgePair(halfEdge)'''
+    
+                    # The only thing on the side of an edge terminating outside of the convex hull
+                    # Is an exterior face, not an interior one. So, we delete any non-exterior
+                    # faces on both sides of this half-edge.
+                    if not partitionMesh.isExteriorFace(halfEdge.leftFace):
+                        partitionMesh.removeFace(halfEdge.leftFace)
+                    if not partitionMesh.isExteriorFace(halfEdge.pair.leftFace):
+                        partitionMesh.removeFace(halfEdge.pair.leftFace)
+                        
+                    partitionMesh.assignExteriorFace(halfEdge.prev)
+                    partitionMesh.assignExteriorFace(halfEdge.pair.next)
+                    
+                    
+                    partitionMesh.removeHalfEdgePair(halfEdge)
+
                 
                 if pred and succ:
                     predSeg = pred.value
@@ -1027,7 +1028,8 @@ class Scene:
                 maxSeg = intSegments[0]
                 minSeg = intSegments[-1]
     
-    
+                # For the face assignment, need to know which line segments
+                # exist before and after this intersection.
                 extendBeforeInt = []
                 extendAfterInt = []
     
@@ -1036,6 +1038,7 @@ class Scene:
                     y0Diff = p.y - intSeg.p0[1]
                     x1Diff = intSeg.p1[0] - p.x
                     y1Diff = intSeg.p1[1] - p.y
+
                     x0Before = x0Diff > EQUAL_THRESHOLD
                     x0Equal = abs(x0Diff) < EQUAL_THRESHOLD
                     y0Before = y0Diff > EQUAL_THRESHOLD
@@ -1053,31 +1056,30 @@ class Scene:
                     if after:
                         extendAfterInt.insert(0, intSeg)  
                 
+                # The half-edge data structure will have a vertex
+                # at this intersection.
                 newVertex = Vertex((p.x, p.y), None)
-                segIndex = 0
-                while newVertex.vertexID < 0 and segIndex < len(extendBeforeInt):
-                    vertSeg = extendBeforeInt[segIndex]
-                    if vertSeg.p1Index >= 0 and abs(vertSeg.p1[0] - p.x) < EQUAL_THRESHOLD and abs(vertSeg.p1[1] - p.y) < EQUAL_THRESHOLD:
-                        newVertex.vertexID = vertSeg.p1Index
-                    segIndex += 1
-                segIndex = 0
-                while newVertex.vertexID < 0 and segIndex < len(extendAfterInt):
-                    vertSeg = extendAfterInt[segIndex]
-                    if vertSeg.p0Index >= 0 and abs(vertSeg.p0[0] - p.x) < EQUAL_THRESHOLD and abs(vertSeg.p0[1] - p.y) < EQUAL_THRESHOLD:
-                        newVertex.vertexID = vertSeg.p0Index
-                    segIndex += 1
-                partitionMesh.verts.append(newVertex)
-                if partitionMesh.vertexOnShape is None and newVertex.vertexID >= 0:
-                    partitionMesh.vertexOnShape = newVertex
+
+                # We need one vertex that's also an original polygon vertex
+                # in order to choose a starting face for the visual number assignments
+                if partitionMesh.vertexOnShape is None:
+                    segIndex = 0
+                    while newVertex.vertexID < 0 and segIndex < len(extendBeforeInt):
+                        vertSeg = extendBeforeInt[segIndex]
+                        if vertSeg.p1Index >= 0 and abs(vertSeg.p1[0] - p.x) < EQUAL_THRESHOLD and abs(vertSeg.p1[1] - p.y) < EQUAL_THRESHOLD:
+                            newVertex.vertexID = vertSeg.p1Index
+                        segIndex += 1
+                    segIndex = 0
+                    while newVertex.vertexID < 0 and segIndex < len(extendAfterInt):
+                        vertSeg = extendAfterInt[segIndex]
+                        if vertSeg.p0Index >= 0 and abs(vertSeg.p0[0] - p.x) < EQUAL_THRESHOLD and abs(vertSeg.p0[1] - p.y) < EQUAL_THRESHOLD:
+                            newVertex.vertexID = vertSeg.p0Index
+                        segIndex += 1
+                    partitionMesh.verts.append(newVertex)
+                    if newVertex.vertexID >= 0:
+                        partitionMesh.vertexOnShape = newVertex
     
-                '''print("Before Segs:")
-                for bs in extendBeforeInt:
-                    print("\t", bs)
-                print("After Segs:")
-                for ps in extendAfterInt:
-                    print("\t", ps)'''
-    
-                # Swap order in tree
+                # Swap segment order in tree
                 while len(intSegments) >= 2:
                     s0 = intSegments.popleft()
                     s1 = intSegments.pop()
@@ -1100,7 +1102,10 @@ class Scene:
                 pred = t.predecessor(minSeg.node)
                 succ = t.successor(maxSeg.node)
     
-    
+                # For each half-edge that comes before the intersection:
+                #  - Assign the new vertex as the half-edge's head.
+                #  - "Close" the face created by each consecutive pair
+                #    of half-edges by connecting said half-edges.
                 for i in range(len(extendBeforeInt)):
                     preSeg = extendBeforeInt[i]
                     preSeg.forwardHalfEdge.headVertex = newVertex
@@ -1109,57 +1114,103 @@ class Scene:
                         preSeg.forwardHalfEdge.next = nextHalfEdge
                         nextHalfEdge.prev = preSeg.forwardHalfEdge
     
+                # Create the new half-edges for segments extending
+                # past the intersection point.
                 newForwardHalfEdges = []
                 for i in range(len(extendAfterInt)):
                     newForwardHalfEdges.append(partitionMesh.createNewPairOfHalfEdges(newVertex, not extendAfterInt[i].increasesToTheRight))
     
-                # First two cases are where we're at a "corner" on the edge the set of regions.
+                # Handle the outermost half-edges in the "fans" before and/or after the intersection.
+                # First two cases only have a fan on one side (before or after), creating a "corner".
                 # Third case is when there are lines both before and after the intersection.
                 if len(extendAfterInt) == 0:
-                    maxPreHalfEdge = extendBeforeInt[-1].forwardHalfEdge
-                    maxPreHalfEdge.next = extendBeforeInt[0].forwardHalfEdge.pair
-                    extendBeforeInt[0].forwardHalfEdge.pair.pev = maxPreHalfEdge
-                    newVertex.outgoingHalfEdge = extendBeforeInt[0].forwardHalfEdge.pair
+                    topForwardHalfEdge = extendBeforeInt[-1].forwardHalfEdge
+                    bottomBackHalfEdge = extendBeforeInt[0].forwardHalfEdge.pair
+                    topForwardHalfEdge.next = bottomBackHalfEdge
+                    bottomBackHalfEdge.prev = topForwardHalfEdge
+                    newVertex.outgoingHalfEdge = bottomBackHalfEdge
+                    # If this "corner" forms a concave "dent" in a region, then
+                    # the two faces on either side of the corner are actually
+                    # the same, but will have been created without "knowing"
+                    # that, so they'll currently be two separate ones.
+                    # Thus, this must be reconciled. We'll keep one and
+                    # replace the other with it.
+                    faceSetToRemove = set()
+                    if not partitionMesh.isExteriorFace(topForwardHalfEdge.leftFace):
+                        halfEdgeToReplaceFaceOn = topForwardHalfEdge
+                        while halfEdgeToReplaceFaceOn is not None and halfEdgeToReplaceFaceOn.leftFace != bottomBackHalfEdge.leftFace:
+                            faceSetToRemove.add(halfEdgeToReplaceFaceOn.leftFace)
+                            halfEdgeToReplaceFaceOn.leftFace = bottomBackHalfEdge.leftFace
+                            halfEdgeToReplaceFaceOn = halfEdgeToReplaceFaceOn.prev
+                    else:
+                        halfEdgeToReplaceFaceOn = bottomBackHalfEdge
+                        while halfEdgeToReplaceFaceOn is not None and halfEdgeToReplaceFaceOn.leftFace != topForwardHalfEdge.leftFace:
+                            faceSetToRemove.add(halfEdgeToReplaceFaceOn.leftFace)
+                            halfEdgeToReplaceFaceOn.leftFace = topForwardHalfEdge.leftFace
+                            halfEdgeToReplaceFaceOn = halfEdgeToReplaceFaceOn.next
+                    for faceToRemove in faceSetToRemove:
+                        partitionMesh.removeFace(faceToRemove)
+
+                    
+                    
                 elif len(extendBeforeInt) == 0:
-                    newForwardHalfEdges[0].pair.next = newForwardHalfEdges[-1]
-                    newForwardHalfEdges[-1].prev = newForwardHalfEdges[0].pair
+                    bottomBackHalfEdge = newForwardHalfEdges[0].pair
+                    topForwardHalfEdge = newForwardHalfEdges[-1]
+                    bottomBackHalfEdge.next = topForwardHalfEdge
+                    topForwardHalfEdge.prev = bottomBackHalfEdge
+                    # Since this is a "new" corner, we cannot set the outer
+                    # half-edges' faces using ones that come from before
+                    # So, we need to find if we're inside a convex face.
+                    # To do this, we look at segments "outside" this "fan"
+                    # in the tree until we find something or reach the exterior.
                     halfEdgePred = pred
                     halfEdgeSucc = succ
                     isOutsideFaceFound = False
                     while halfEdgePred is not None and not isOutsideFaceFound:
                         if halfEdgePred.value.forwardHalfEdge is not None:
                             sharedFace = halfEdgePred.value.forwardHalfEdge.leftFace
-                            newForwardHalfEdges[-1].leftFace = sharedFace
-                            newForwardHalfEdges[0].pair.leftFace = sharedFace
+                            topForwardHalfEdge.leftFace = sharedFace
+                            bottomBackHalfEdge.leftFace = sharedFace
                             isOutsideFaceFound = True
                         else:
                             halfEdgePred = t.predecessor(halfEdgePred)
                     while halfEdgeSucc is not None and not isOutsideFaceFound:
                         if halfEdgeSucc.value.forwardHalfEdge is not None:
-                            sharedFace = halfEdgeSucc.value.forwardHalfEdge.leftFace
-                            newForwardHalfEdges[-1].leftFace = sharedFace
-                            newForwardHalfEdges[0].pair.leftFace = sharedFace
+                            sharedFace = halfEdgeSucc.value.forwardHalfEdge.pair.leftFace
+                            topForwardHalfEdge.leftFace = sharedFace
+                            bottomBackHalfEdge.leftFace = sharedFace
                             isOutsideFaceFound = True
                         else:
-                            halfEdgeSucc = t.predecessor(halfEdgeSucc)
+                            halfEdgeSucc = t.successor(halfEdgeSucc)
                             
-                    else:
-                        partitionMesh.assignExteriorFace(newForwardHalfEdges[-1])
-                        partitionMesh.assignExteriorFace(newForwardHalfEdges[0].pair)
+                    if not isOutsideFaceFound:
+                        partitionMesh.assignExteriorFace(topForwardHalfEdge)
+                        partitionMesh.assignExteriorFace(bottomBackHalfEdge)
                     
                     newVertex.outgoingHalfEdge = newForwardHalfEdges[0]
                 else:
-                    newVertex.outgoingHalfEdge = extendBeforeInt[0].forwardHalfEdge.pair
+                    bottomHalfEdgeBeforeInt = extendBeforeInt[0].forwardHalfEdge.pair
+                    topHalfEdgeBeforeInt = extendBeforeInt[-1].forwardHalfEdge
+                    bottomHalfEdgeAfterInt = newForwardHalfEdges[0].pair
+                    topHalfEdgeAfterInt = newForwardHalfEdges[-1]
+
+                    newVertex.outgoingHalfEdge = bottomHalfEdgeBeforeInt
     
-                    extendBeforeInt[-1].forwardHalfEdge.next = newForwardHalfEdges[-1]
-                    newForwardHalfEdges[-1].prev = extendBeforeInt[-1].forwardHalfEdge
+                    topHalfEdgeBeforeInt.next = topHalfEdgeAfterInt
+                    topHalfEdgeAfterInt.prev = topHalfEdgeBeforeInt
     
-                    newForwardHalfEdges[0].pair.next = extendBeforeInt[0].forwardHalfEdge.pair
-                    extendBeforeInt[0].forwardHalfEdge.pair.prev = newForwardHalfEdges[0].pair
+                    bottomHalfEdgeAfterInt.next = bottomHalfEdgeBeforeInt
+                    bottomHalfEdgeBeforeInt.prev = bottomHalfEdgeAfterInt
     
-                    newForwardHalfEdges[-1].leftFace = newForwardHalfEdges[-1].prev.leftFace
-                    newForwardHalfEdges[0].pair.leftFace = newForwardHalfEdges[0].pair.next.leftFace
+                    topHalfEdgeAfterInt.leftFace = topHalfEdgeBeforeInt.leftFace
+                    bottomHalfEdgeAfterInt.leftFace = bottomHalfEdgeBeforeInt.leftFace
     
+                # For each half-edge that comes after the intersection:
+                #  - Connect consecutive pairs of half-edges together
+                #    at the intersection point.
+                #  - Create a new face between each consecutive pair
+                #    of half-edges.
+
                 for i in range(len(extendAfterInt) - 1):
                     newForwardHalfEdges[i+1].pair.next = newForwardHalfEdges[i]
                     newForwardHalfEdges[i].prev = newForwardHalfEdges[i+1].pair 
@@ -1169,10 +1220,14 @@ class Scene:
                     newForwardHalfEdges[i].leftFace = newFace
                     newForwardHalfEdges[i].prev.leftFace = newFace
                     
+                # Assign the new forward half-edges to their respective segments.
                 for i in range(len(extendAfterInt)):
                     extendAfterInt[i].forwardHalfEdge = newForwardHalfEdges[i]
                 
-                
+                # All of the face handling is now complete.
+                # Next, normal line sweep intersection testing continues.
+                # We need to check the new max and min segments against their
+                # "outside" neighbour line segments for new intersections.
                 if pred:
                     predSeg = pred.value
                     # print("predSeg:", predSeg)
@@ -1208,9 +1263,5 @@ class Scene:
             # for sThing in t.valueList():
             #     if not t.isMatchingNodeInTree(sThing.node):
             #         print("Problem for", sThing, "node!!!")
-        '''print("DEBUG LIST:")
-        for s in debugList:
-            print("\t", s)'''
         return partitionMesh
 
-    
