@@ -1,3 +1,18 @@
+## TODO
+
+Links on using third-party modules in Blender Addons:
+
+ * Comprehensive overview: https://blender.stackexchange.com/a/181953
+   * SUPER comprehensive overview, worth _eventually_ implementing something similar to: https://github.com/robertguetzkow/blender-python-examples/tree/master/add_ons/install_dependencies
+ * Shell commands: https://blender.stackexchange.com/a/122337
+ * Simple Python code: https://blender.stackexchange.com/a/139720
+
+
+
+## Multi-File Notes
+
+**NEED TO UPDATE THIS SECTION! I CHANGED `__init__.py` SINCE I WROTE THIS!**
+
 My Current Quick Process For Multi-File Add-Ons:
 
 Create a .zip file that, within it, has a folder with the same name, and then the __init__.py and whatnot.

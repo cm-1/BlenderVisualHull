@@ -22,6 +22,7 @@ class PointCreator:
             for vi in poly.vertices:
                 newVert = (obj.data.vertices[vi].co.x, obj.data.vertices[vi].co.y)
                 polyVerts.append(newVert)
+            print("Adding polygon:", polyVerts)
             scene.addPolygon(polyVerts)
         scene.calcFreeLines()
 

@@ -13,6 +13,15 @@ class EventType(Enum):
     LEFT = 0
     INTERSECTION = 1
     RIGHT = 2
+    
+
+class SideOfShapeType(Enum):
+    UNTESTED = 0
+    LEFT = 1
+    INSIDE = 2
+    RIGHT = 3
+    
+    
  
 
 class SweepLine:
@@ -186,7 +195,7 @@ class MyLine:
         self.isSegment = isSegment
         self.length = np.linalg.norm(self.p1 - self.p0)
         
-        self.isVertical = (p0[0] == p1[0])
+        self.isVertical = abs(p0[0] - p1[0]) < EQUAL_THRESHOLD
         self.m = None
         self.b = None
         if not self.isVertical:
@@ -196,6 +205,8 @@ class MyLine:
         # Normalized direction vec from p0 to p1
         self.dir = (self.p1 - self.p0)/self.length
         
+    def __repr__(self):
+        return "{0}->{1}, isSegment: {2}".format(self.p0, self.p1, self.isSegment)
         
     # Math here basically came from setting up an augmented matrix
     # for the 2D case of line intersection and solving it.
@@ -341,12 +352,33 @@ class MySortableSegment(MyActiveLine):
 class MyPolygon:
     def __init__(self, pts):
         npts = np.array(pts)
+        
+        # Find out whether the polygon is clockwise or counterclockwise.
+        # Will be using the technique given in StackOverflow user Beta's answer
+        # to user Stécy's question "How to determine if a list of polygon points are in clockwise order?"
+        # asked on 2009-07-22. Link: https://stackoverflow.com/a/1165943/11295586
+        # An explanation is given at: https://web.archive.org/web/20200812125342/https://www.element84.com/blog/determining-the-winding-of-a-polygon-given-as-a-set-of-ordered-points
+        # Basically, sum up (x2 − x1)(y2 + y1) over all edges
+        # Curve is clockwise iff sum is positive.
+        xy0s = npts
+        xy1s = np.roll(xy0s, -1, axis=0) # Shift vertices by 1 index
+        terms = (xy1s[:, 0] - xy0s[:, 0])*(xy1s[:, 1] + xy0s[:, 1])
+        twiceArea = terms.sum() # As described in the links above, the sum is twice the area
+        self._isCW = (twiceArea > 0)
+        
         # "Close" the polygon s.t. the first and last vertex are identical.
         # First, check if the first and last points are already the same.
         if not np.all(npts[0] == npts[-1]):
             # If not, add the first pt to the end.
             npts = np.vstack((npts, npts[0, :]))
         self._coords = npts
+    
+    def changeOrientation(self):
+        self._isCW = not self._isCW
+        self._coords = np.flip(self._coords, axis=0)
+    
+    def isClockwise(self):
+        return self._isCW
     
     def getCoords(self):
         return np.copy(self._coords) # Look into the shallow/deep copy nature of this at some point!
@@ -470,23 +502,13 @@ class Scene:
         
     def addPolygon(self, pts):
         newVertices = np.array(pts, dtype=np.float64)
-        #newVertices[:, 0] = newVertices[:, 0] - 2.33
 
-        self.polygons.append(MyPolygon(pts)) #newVertices.tolist()))
+        newPolygon = MyPolygon(pts)
+
+        self.polygons.append(newPolygon)
         
-        # Find out whether the polygon is clockwise or counterclockwise.
-        # Will be using the technique given in StackOverflow user Beta's answer
-        # to user Stécy's question "How to determine if a list of polygon points are in clockwise order?"
-        # asked on 2009-07-22. Link: https://stackoverflow.com/a/1165943/11295586
-        # An explanation is given at: https://web.archive.org/web/20200812125342/https://www.element84.com/blog/determining-the-winding-of-a-polygon-given-as-a-set-of-ordered-points
-        # Basically, sum up (x2 − x1)(y2 + y1) over all edges
-        # Curve is clockwise iff sum is positive.
         
-        xy1s = newVertices
-        xy2s = np.roll(xy1s, -1, axis=0) # Shift vertices by 1 index
-        terms = (xy2s[:, 0] - xy1s[:, 0])*(xy2s[:, 1] + xy1s[:, 1])
-        twiceArea = terms.sum() # As described in the links above, the sum is twice the area
-        self.cwList.append( (twiceArea > 0) )
+        self.cwList.append(newPolygon.isClockwise())
         
         
         # Separate the x and y values for the new vertices.
@@ -538,7 +560,13 @@ class Scene:
                 if self.isVertexConcave(j):
                     continue
                 candidate = MyLine(self.vertices[i], self.vertices[j], False)
-                intersectsObj = False
+                vertDistOnEachAxis = abs(self.vertices[i] - self.vertices[j])
+                verticesTouch = np.all(vertDistOnEachAxis < EQUAL_THRESHOLD)
+                
+                intersectsObj = verticesTouch
+                
+                vertIntersections = []
+                intersectedVertexIndices = set()
                 
                 polygonCount = 0
                 vertCount = 0 # Vertex index of start of current edge analyzed
@@ -567,37 +595,108 @@ class Scene:
                             # But we need to rule out intersections with a vertex that do not pierce the shape,
                             # because these are fine (in fact, they are REQUIRED for the algorithm).
                             # We first deal with the line intersecting the vertex at the start of its edge, at v0.
+                            sideResult = SideOfShapeType.UNTESTED
                             if (abs(intersection.meetT) < EQUAL_THRESHOLD):
                                 # Test if candidate.dir is between both edge dirs going AWAY from v0
-                                intersectsThisTime = self.isLineInsideEdgeAngle(vertCount, candidate.dir)
+                                sideResult = self.isLineInsideEdgeAngle(vertCount, candidate.dir)
+                                intersectsThisTime = (sideResult == SideOfShapeType.INSIDE)
+                                if vertCount not in intersectedVertexIndices:
+                                    vertIntersection = {"distAlongLine": intersection.meetS, "side": sideResult}
+                                    vertIntersections.append(vertIntersection)
+                                    intersectedVertexIndices.add(vertCount)
                             # Same idea, but for the case where the intersection is at
                             # the other side of the edge, closer to v1
                             elif (abs(intersection.meetT - edgeLine.length) < EQUAL_THRESHOLD):
                                 # Test if candidate.dir is between both edge dirs going AWAY from v1
-                                intersectsThisTime = self.isLineInsideEdgeAngle(self.nextIndices[vertCount], candidate.dir)
+                                nextVertIndex = self.nextIndices[vertCount]
+                                sideResult = self.isLineInsideEdgeAngle(nextVertIndex, candidate.dir)
+                                intersectsThisTime = (sideResult == SideOfShapeType.INSIDE)
+                                if nextVertIndex not in intersectedVertexIndices:
+                                    vertIntersection = {"distAlongLine": intersection.meetS, "side": sideResult}
+                                    vertIntersections.append(vertIntersection)
+                                    intersectedVertexIndices.add(nextVertIndex)
                             #if intersectsThisTime:
                             #    print(candidate.p0, "->", candidate.p1, "intersects", v0, "->", v1, "meetT:", intersection.meetT, "len:", edgeLine.length)
                             intersectsObj = (intersectsObj or intersectsThisTime)
-                            
+                                
                         edgeNum += 1
                         vertCount += 1
                     polygonCount += 1
+                    
+                # Suppose the line grazes multiple vertices, but does not
+                # penetrate the shape's interior at all. It may still
+                # not really be a line of site. 
+                # Consider, for example, a line passing through two vertices
+                # touching each other at opposite sides of a line, i.e.
+                # something that locally looks like >< with the line passing
+                # through vertically. Or a line passing vertically through
+                # something that locally looks like:
+                # >
+                #  <
+                # >
+                # In these cases, the line has no "room to move/rotate" to the
+                # sides so it does not represent an area of nonzero width
+                # through which visual lines can pass. We test for those here.
+                # 
+                # Note that we already partially test for the >< case when
+                # we, just after the line creation, check if the two vertices
+                # making up the line touch each other. That means that, here,
+                # we only need to test cases where 3+ vertices are involved.
+                if not intersectsObj and len(vertIntersections) > 2:
+                    vertIntersections.sort(key = (lambda a: a["distAlongLine"]))
+                                        
+                    sideSwitchCount = 0
+                    lineCannotMove = False
+                    
+                    prevDist = vertIntersections[0]["distAlongLine"]
+                    prevSide = vertIntersections[0]["side"]
+                    
+                    for lineVertIndex in range(1, len(vertIntersections)):
+                        currDist = vertIntersections[lineVertIndex]["distAlongLine"]
+                        currSide = vertIntersections[lineVertIndex]["side"]
+                        
+                        if currSide != prevSide:
+                            sideSwitchCount += 1
+                            # The "><" case:
+                            touchingCase = abs(currDist - prevDist) < EQUAL_THRESHOLD
+                            
+                            # The case of
+                            # >
+                            #  <
+                            # >
+                            separatedCase = sideSwitchCount > 1
+                            
+                            if touchingCase or separatedCase:
+                                lineCannotMove = True
+                                break
+                        prevDist = currDist
+                        prevSide = currSide
+                        
+                    
+                    intersectsObj = intersectsObj or lineCannotMove
+                
+                # All of the intersection testing is finally done.
+                # Now, if it didn't intersect, we can create active segments.
                 if not intersectsObj:
                     newSegments = self.createActiveSegments(i, j)                    
                     
                     for newSeg in newSegments:
+
                         cKey = round(newSeg.p0[0], EQUAL_DECIMAL_PLACES)
                         dictOfInterest = vertLineDict
                         if not newSeg.isVertical:
                             cKey = (round(newSeg.m, EQUAL_DECIMAL_PLACES), round(newSeg.b, EQUAL_DECIMAL_PLACES))
                             dictOfInterest = nonVertLineDict
+
                         if cKey in dictOfInterest:
                             dictOfInterest[cKey].append(newSeg)
                         else:
                             dictOfInterest[cKey] = [newSeg]
+                
         self.unifySegments(nonVertLineDict, False)
         self.unifySegments(vertLineDict, True)
         self.calculateVisualHull()
+        return
             
                 
     def unifySegments(self, segmentDictionary, isVertical):
@@ -672,7 +771,7 @@ class Scene:
                     
     def isLineInsideEdgeAngle(self, vertIndex, dirToTest):
         if self.isVertexConcave(vertIndex):
-            return True
+            return SideOfShapeType.INSIDE
 
         v0 = self.vertices[self.prevIndices[vertIndex]]
         v1 = self.vertices[vertIndex]
@@ -696,8 +795,26 @@ class Scene:
         dotThresh = abs(np.dot(bisector, dir0))
         testDot =  abs(np.dot(bisector, dirToTest))
         if testDot <= dotThresh + EQUAL_THRESHOLD:
-            return False
-        return True
+            # However, we then want to know which side of the shape the line's on.
+            # Construct a local coordinate frame.
+            # The "up" vector will be dirToTest.
+            # From this, the "right" vector will be [y, -x]
+            # The matrix to bring vectors into this local coord frame will be:
+            # | y  -x |
+            # | x   y | 
+            up = dirToTest
+            changeBasis = np.array([
+                [up[1], -up[0]],
+                [up[0], up[1]]
+            ])
+            # Convert the bisector into this local coordinate frame via matrix mult.        
+            bisectorLocal = changeBasis @ bisector
+            
+            if bisectorLocal[0] > 0:
+                return SideOfShapeType.LEFT
+            else:
+                return SideOfShapeType.RIGHT
+        return SideOfShapeType.INSIDE
     
     # Take in vertices v0, v1, v2 and whether mesh is counter-clockwise (ccw).
     # Output whether v1 is a concave vertex.
@@ -889,10 +1006,10 @@ class Scene:
             pL = s.p0
             pR = s.p1
             shouldSwap = False
-            if pR[0] < pL[0]:
+            if pR[0] < pL[0] - EQUAL_THRESHOLD:
                 shouldSwap = True
-            elif pR[0] == pL[0]:
-                if pR[1] < pL[1]:
+            elif abs(pR[0] - pL[0]) < EQUAL_THRESHOLD:
+                if pR[1] < pL[1] - EQUAL_THRESHOLD:
                     shouldSwap = True
             
             if shouldSwap:
@@ -914,8 +1031,6 @@ class Scene:
         
             
         while len(q) > 0:
-            # if eventCount == 31:
-            #     print("here!")
             # print("\nEvents:", eventCount)
             eventCount += 1
             p = heapq.heappop(q)
