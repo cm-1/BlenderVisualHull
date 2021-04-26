@@ -1,20 +1,35 @@
 For each face:
     1. Make copy of mesh.
-    2. Unite neighbour faces that have same normal.
-    3. Add all of their IDs to a set() to make sure they aren't chosen again.
-    4. Go into edit mode with the copy.
-    5. Add a plane with the same normal and same position as the deleted face.
-        a) To get one vector perpendicular to normal, calculate 2D perpendicular.
-        b) Use cross product to get another perpendicular vector.
-        c) Use these perpendicular vectors and the mesh's "radius" to find the plane's corners.
-    6. Select the plane (and NOTHING ELSE).
-    7. Do Ctrl+F => Intersect (Knife)
-    8. Delete all vertices that do not lie on the plane. 
-    9. Delete the original face.
-    10. If anything remains (otherwise, just add face to "keep" mesh):
+    2. Perform a limit dissolve.
+    3. Now, for each face in the mesh, make ANOTHER copy of the whole mesh and continue.
+    4. Bisect the copy with face.normal and with a coord of face.vertices[0].co
+    5. Delete the polygon corresponding to the original face.
+    6. Get the set of all "polygons" that remain.
+    7. If anything remains (otherwise, just add orig face to "keep" mesh):
         a) Project the result into the plane to get 2D coordinates.
         b) Calculate its 2D visual hull.
         c) Overlap the 2D visual hull with the projected/2D original face.
         d) If intersection exists, add it to "discard" mesh.
         e) If difference exists, add it to "keep" mesh.
         
+face has a .normal attribute
+face has a .index but this can change.
+
+Good:
+    1. Make copy of mesh.
+    2. Perform a limit dissolve.
+    3. Now, for each face in the mesh, make ANOTHER copy of the whole mesh and continue.
+    4. Bisect the copy with face.normal and with a coord of face.vertices[0].co
+    5. Delete the polygon corresponding to the original face.
+    7. If anything remains (otherwise, just add orig face to "keep" mesh):
+        a) Project the result into the plane to get 2D coordinates.
+        b) Calculate its 2D visual hull.
+        c) Overlap the 2D visual hull with the projected/2D original face.
+        d) If intersection exists, add it to "discard" mesh.
+        e) If difference exists, add it to "keep" mesh.
+        
+Unsure:
+
+    6. Get the set of all "polygons" that remain.
+
+For 6., maybe https://blender.stackexchange.com/a/105142

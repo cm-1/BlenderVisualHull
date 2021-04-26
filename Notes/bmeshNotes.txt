@@ -1,0 +1,18 @@
+https://docs.blender.org/api/current/bmesh.ops.html
+
+    bmesh.ops.contextual_create(bm, geom, mat_nr, use_smooth)
+    
+    bmesh.ops.join_triangles(bm, faces, cmp_seam, cmp_sharp, cmp_uvs, cmp_vcols, cmp_materials, angle_face_threshold, angle_shape_threshold)
+    bmesh.ops.remove_doubles(bm, verts, dist)
+    bmesh.ops.holes_fill(bm, edges, sides)
+    bmesh.ops.bmesh_to_mesh(bm, mesh, object)
+    bmesh.ops.mesh_to_bmesh(bm, mesh, object, use_shapekey)
+    bmesh.ops.dissolve_edges(bm, edges, use_verts, use_face_split)
+    bmesh.ops.dissolve_limit(bm, angle_limit, use_dissolve_boundaries, verts, edges, delimit)
+    bmesh.ops.bisect_plane(bm, geom, dist, plane_co, plane_no, use_snap_center, clear_outer, clear_inner)
+    bmesh.ops.delete(bm, geom, context)
+    bmesh.ops.duplicate(bm, geom, dest, use_select_history, use_edge_flip_from_face)
+    bmesh.ops.convex_hull(bm, input, use_existing_faces)
+
+https://blender.stackexchange.com/questions/90724/what-is-the-best-way-to-copy-append-geometry-from-one-bmesh-to-another
+    "Edge Split. Disconnects faces along input edges."
