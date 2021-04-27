@@ -68,7 +68,7 @@ class PointCreator:
         changedVec = changeOfBasis @ vecOnPlane
         return (changedVec.x, changedVec.y)
 
-    def _diffAtan(self, fromCoord, toCoord):
+    def _diffAngleCCW(self, fromCoord, toCoord):
         def atanPos(coord):
             regAtan = math.atan2(coord[1], coord[0])
             if regAtan < 0:
@@ -104,12 +104,17 @@ class PointCreator:
             bmCopy.faces.ensure_lookup_table()
             faceToUse = bmCopy.faces[origFace.index]
 
+            print("Face to use:")
+            for v in faceToUse.verts:
+                print(" -", v.co)
 
 
             # 4. Bisect the copy with face.normal and with a coord of face.vertices[0].co
             planeNormal = faceToUse.normal.copy()
             planePoint = faceToUse.verts[0].co.copy()
 
+            print("Normal:", planeNormal)
+            print("Plane point:", planePoint)
 
             # First, we need to get two orthogonal vectors to use for the
             # "basis" of our 2D plane space.
@@ -137,14 +142,26 @@ class PointCreator:
             # like "myMatrix = Matrix([topRow, middleRow, bottomRow])"
             changeOfBasis = mathutils.Matrix([localX, localY, planeNormal])
 
-            geom = list(bmCopy.verts) + list(bmCopy.edges) + list(bmCopy.faces)
-            r = bmesh.ops.bisect_plane(bmCopy, geom=geom, 
-                plane_co=planePoint, plane_no=planeNormal,
-                clear_outer = True, clear_inner = True)
 
+            geom = list(bmCopy.verts) + list(bmCopy.edges) + list(bmCopy.faces)
+            print("Faces before:", len(bmCopy.faces))
+            print("Face of interest check:")
+            for v in bmCopy.faces[faceToUse.index].verts:
+                print(" -", v.co)
+            r = bmesh.ops.bisect_plane(bmCopy, geom=geom,
+                plane_co=planePoint, plane_no=planeNormal,
+                clear_outer = True, clear_inner = True, use_snap_center = False)
+            print("Faces after:", len(bmCopy.faces))
+            for f in bmCopy.faces:
+                for v in f.verts:
+                    print(" -", v.co)
+                print("-----")
             # 5. Delete the polygon corresponding to the original face.
             # (Also delete doubles to prevent other problems)
-            bmesh.ops.delete(bmCopy, geom = [faceToUse], context='FACES')
+            try:
+                bmesh.ops.delete(bmCopy, geom = [faceToUse], context='FACES')
+            except:
+                print("\n(!!!)Guess it's not working...\n")
 
             bmesh.ops.delete(bmCopy, geom = list(bmCopy.faces), context="FACES_ONLY")
 
@@ -152,6 +169,7 @@ class PointCreator:
 
             # 6. Get the set of all "polygons" that remain.
             islands = self._getIslands(bmCopy)
+            print("Islands:", [[v.co for v in i] for i in islands])
 
             # Create faces for the islands so that order and everything is 
             # definitely okay. We want to treat these as polygons, not as mere
@@ -194,14 +212,14 @@ class PointCreator:
                         adjVert = e.other_vert(currentVert)
                         diffX = vertCoordDict[adjVert][0] - currentPos[0]
                         diffY = vertCoordDict[adjVert][1] - currentPos[1]
-                        angleDiff = self._diffAtan(lastDir, (diffX, diffY))
+                        angleDiff = self._diffAngleCCW(lastDir, (diffX, diffY))
                         if angleDiff < minAngleDiff and adjVert.index != prevID:
                             minAngleDiff = angleDiff
                             currentEdge = e
                     
                     newVert = currentEdge.other_vert(currentVert)
                     newPos = vertCoordDict[newVert]
-                    lastDir = (newPos[0] - currentPos[0], newPos[1] - currentPos[1])
+                    lastDir = (currentPos[0] - newPos[0], currentPos[1] - newPos[1])
                     prevID = currentVert.index
                     currentVert = newVert
                     outerVerts.append(currentVert)
@@ -302,6 +320,9 @@ class PointCreator:
                 keepPolygons += difference3D
             else:
                 keepPolygons.append([v.co for v in origFace.verts])
+
+        if len(keepPolygons) == 0 and len(discardPolygons) > 0:
+            print("DISCARDING ONLY!")
 
         self._createFaces(keepPolygons, "keepSurface")
         self._createFaces(discardPolygons, "discardSurface")

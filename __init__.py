@@ -26,6 +26,7 @@ if "bpy" in locals():
         'rbt': rbt,
         'visHullTwoD': visHullTwoD,
         'importTest': importTest,
+        'visHullFlatOperator': visHullFlatOperator,
         'sceneCreation2D': sceneCreation2D
     }
     import importlib
@@ -44,6 +45,7 @@ else:
 # Now, the "normal" imports
 import bpy
 from .importTest import PointCreator
+from .visHullFlatOperator import FlatVisHullCreator
 from .sceneCreation2D import SceneCreator2D
 from . import rbt # Unused import, but needed for above importlib stuff.
 
@@ -62,7 +64,25 @@ class ObjectVisualHull(bpy.types.Operator):
 
         pc.getPoints()
 
-        pc.scenePrintTest()
+        #pc.scenePrintTest()
+
+        return {'FINISHED'}
+
+class ObjectVisualHullFlat(bpy.types.Operator):
+    """Object Visual Hull Float"""
+    bl_idname = "object.visual_hull_flat"
+    bl_label = "Visual Hull Flat"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    # unusedProp: bpy.props.IntProperty(name="Unused Property", default=2, min=1, max=100)
+
+    def execute(self, context):
+        # pc = PointCreator(self.unusedProp)
+        pc = FlatVisHullCreator()
+
+        pc.getPoints()
+
+        #pc.scenePrintTest()
 
         return {'FINISHED'}
 
@@ -84,6 +104,9 @@ class ObjectSceneCreation2D(bpy.types.Operator):
 def menu_func_visual_hull(self, context):
     self.layout.operator(ObjectVisualHull.bl_idname)
 
+def menu_func_visual_hull_flat(self, context):
+    self.layout.operator(ObjectVisualHullFlat.bl_idname)
+
 def menu_func_scene_2D(self, context):
     self.layout.operator(ObjectSceneCreation2D.bl_idname)
 
@@ -91,12 +114,18 @@ def register():
     bpy.utils.register_class(ObjectVisualHull)
     bpy.types.VIEW3D_MT_object.append(menu_func_visual_hull)
 
+    bpy.utils.register_class(ObjectVisualHullFlat)
+    bpy.types.VIEW3D_MT_object.append(menu_func_visual_hull_flat)
+
     bpy.utils.register_class(ObjectSceneCreation2D)
     bpy.types.VIEW3D_MT_add.append(menu_func_scene_2D)
 
 def unregister():
     bpy.utils.unregister_class(ObjectVisualHull)
     bpy.types.VIEW3D_MT_object.remove(menu_func_visual_hull)
+
+    bpy.utils.unregister_class(ObjectVisualHullFlat)
+    bpy.types.VIEW3D_MT_object.remove(menu_func_visual_hull_flat)
 
     bpy.utils.unregister_class(ObjectSceneCreation2D)
     bpy.types.VIEW3D_MT_add.remove(menu_func_scene_2D)
