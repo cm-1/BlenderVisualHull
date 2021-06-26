@@ -70,6 +70,7 @@ if "bpy" in locals():
 
 ```
 
+Commands for installing pyclipper. See other stuff to see where you need to `cd` to before running these.
 ```
 ./python -m ensurepip
 ./python -m pip install --upgrade pip
