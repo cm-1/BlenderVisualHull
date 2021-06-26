@@ -23,7 +23,7 @@ if "bpy" in locals():
     # If we reload A before B here, then A will not have B's newest changes in it. 
     # So, we need to reload some modules before the other modules that depend on them.
     myOwnModules = {
-        'rbt': rbt,
+        'rbt': RedBlackTree.rb_tree,
         'visHullTwoD': visHullTwoD,
         'importTest': importTest,
         'visHullFlatOperator': visHullFlatOperator,
@@ -47,7 +47,7 @@ import bpy
 from .importTest import PointCreator
 from .visHullFlatOperator import FlatVisHullCreator
 from .sceneCreation2D import SceneCreator2D
-from . import rbt # Unused import, but needed for above importlib stuff.
+from .RedBlackTree import rb_tree # Unused import, but needed for above importlib stuff.
 
 
 class ObjectVisualHull(bpy.types.Operator):
