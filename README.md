@@ -2,10 +2,13 @@
 
 Links on using third-party modules in Blender Addons:
 
+ * Official addons for comparison: https://developer.blender.org/diffusion/BA/browse/master/
  * Comprehensive overview: https://blender.stackexchange.com/a/181953
    * SUPER comprehensive overview, worth _eventually_ implementing something similar to: https://github.com/robertguetzkow/blender-python-examples/tree/master/add_ons/install_dependencies
  * Shell commands: https://blender.stackexchange.com/a/122337
  * Simple Python code: https://blender.stackexchange.com/a/139720
+ * https://b3d.interplanety.org/en/creating-multifile-add-on-for-blender/
+ * On shortcut for reloading and stuff: https://web.archive.org/web/20210314173702/https://developer.blender.org/T67387
 
 
 
@@ -65,4 +68,10 @@ if "bpy" in locals():
         print("Reinstalling:", moduleName)
         importlib.reload(module)
 
+```
+
+```
+./python -m ensurepip
+./python -m pip install --upgrade pip
+./python -m pip install pyclipper
 ```
